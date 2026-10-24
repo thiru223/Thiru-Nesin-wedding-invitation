@@ -58,22 +58,43 @@ function initializeMusic() {
   tryStartMusic();
 }
 
-// If autoplay is blocked, start music on the visitor's first interaction
-// anywhere on the page, instead of requiring the separate music button.
-window.addEventListener("DOMContentLoaded", initializeMusic);
-window.addEventListener("pageshow", () => {
-  if (music.paused && !autoplayStarted) tryStartMusic();
-});
+// Mobile Safari is stricter about audio: call play() directly from the
+// visitor's trusted gesture, without waiting for another promise.
+function startMusicFromGesture() {
+  if (!music.paused) {
+    showMusicState(true);
+    autoplayStarted = true;
+    return;
+  }
+  const playPromise = music.play();
+  if (playPromise && typeof playPromise.then === "function") {
+    playPromise.then(() => {
+      autoplayStarted = true;
+      showMusicState(true);
+    }).catch(() => {
+      showMusicState(false);
+    });
+  }
+}
 
+// Start playback directly when the visitor taps "Discover our invitation".
+const discoverButton = byId("discoverInvitation");
+if (discoverButton) {
+  discoverButton.addEventListener("click", startMusicFromGesture);
+}
+
+// Also try to start music on the first interaction anywhere on the page.
 function startMusicOnFirstInteraction() {
-  if (music.paused) tryStartMusic();
+  if (music.paused) startMusicFromGesture();
   window.removeEventListener("pointerdown", startMusicOnFirstInteraction);
   window.removeEventListener("keydown", startMusicOnFirstInteraction);
   window.removeEventListener("touchstart", startMusicOnFirstInteraction);
+  window.removeEventListener("click", startMusicOnFirstInteraction);
 }
 window.addEventListener("pointerdown", startMusicOnFirstInteraction, { once: true });
 window.addEventListener("keydown", startMusicOnFirstInteraction, { once: true });
 window.addEventListener("touchstart", startMusicOnFirstInteraction, { once: true, passive: true });
+window.addEventListener("click", startMusicOnFirstInteraction, { once: true });
 
 musicToggle.addEventListener("click", async () => {
   if (music.paused) {
